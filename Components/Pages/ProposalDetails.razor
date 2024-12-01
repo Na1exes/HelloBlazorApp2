@@ -1,0 +1,391 @@
+@page "/proposals/{Id:int}"
+@using HelloBlazorApp.Data.Entities
+@using HelloBlazorApp.Services
+@using HelloBlazorApp.Components.Materials
+@inject IProposalPostServices ProposalService
+@inject NavigationManager NavigationManager
+
+@if (_proposal == null)
+{
+    <PageTitle>Заявка не найдена!</PageTitle>
+    <h1 class="text-center">Заявка не найдена!</h1>
+}
+else
+{
+    <PageTitle>Заявка №@GetFormattedProposalNumber(_proposal)</PageTitle>
+
+    <div class="container mt-4">
+        <div class="mb-4">
+            <Button Color="Color.Secondary" Clicked="@ReturnToList">
+                <Icon Name="IconName.ArrowLeft" /> Вернуться
+            </Button>
+        </div>
+
+        <h1 class="text-center mb-4">Заявка №@GetFormattedProposalNumber(_proposal)</h1>
+
+        <style>
+            .nav-tabs .nav-link {
+                cursor: pointer;
+            }
+        </style>
+
+        <Tabs SelectedTab="@_selectedTab" SelectedTabChanged="@OnSelectedTabChanged">
+            <Items>
+                <Tab Name="proposal">Заявка</Tab>
+                <Tab Name="materials">Материалы</Tab>
+            </Items>
+            <Content>
+                <TabPanel Name="proposal">
+                    <Table>
+                        <TableBody>
+                            <TableRow>
+                                <TableRowHeader>№ заявки:</TableRowHeader>
+                                <TableRowCell>@GetFormattedProposalNumber(_proposal)</TableRowCell>
+                            </TableRow>
+                            <TableRow>
+                                <TableRowHeader>Автор заявки:</TableRowHeader>
+                                <TableRowCell>@_proposal.Author</TableRowCell>
+                            </TableRow>
+                            <TableRow>
+                                <TableRowHeader>Подразделение автора:</TableRowHeader>
+                                <TableRowCell>@_proposal.Depart</TableRowCell>
+                            </TableRow>
+                            <TableRow>
+                                <TableRowHeader>Дата создания:</TableRowHeader>
+                                <TableRowCell>@_proposal.Creation_date.ToString("dd.MM.yyyy")</TableRowCell>
+                            </TableRow>
+                            <TableRow>
+                                <TableRowHeader>Статус:</TableRowHeader>
+                                <TableRowCell>@_proposal.TextStatus</TableRowCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+
+                    @if (_proposal.Status == ProposalStatus.Created)
+                    {
+                        <div class="d-flex gap-2 mt-4">
+                            <Button Color="Color.Success" Clicked="@ShowApproveDialog">
+                                <Icon Name="IconName.Check" /> Утвердить
+                            </Button>
+                            <Button Color="Color.Primary" Clicked="@ShowEditDialog">
+                                <Icon Name="IconName.Edit" /> Редактировать
+                            </Button>
+                            <Button Color="Color.Danger" Clicked="@ShowDeleteDialog">
+                                <Icon Name="IconName.Delete" /> Удалить
+                            </Button>
+                        </div>
+                    }
+                </TabPanel>
+                <TabPanel Name="materials">
+                    @if (_proposal.Status == ProposalStatus.Created)
+                    {
+                        <div class="mb-3">
+                            <Button Color="Color.Primary" Clicked="@ShowCreateMaterialDialog">
+                                <Icon Name="IconName.Add" /> Создать материал
+                            </Button>
+                        </div>
+                    }
+
+                    <DataGrid TItem="ProposalMaterial"
+                             Data="@_materials.Where(m => m.Status != MaterialStatus.Deleted)"
+                             Responsive
+                             Sortable
+                             ShowPager
+                             PageSize="10"
+                             Hoverable
+                             Striped>
+                        <DataGridColumn TItem="ProposalMaterial"
+                                      Field="@nameof(ProposalMaterial.Material_Name)"
+                                      Caption="Наименование"
+                                      Sortable="true" />
+                        <DataGridColumn TItem="ProposalMaterial"
+                                      Field="@nameof(ProposalMaterial.Material_Code)"
+                                      Caption="Код"
+                                      Sortable="true" />
+                        <DataGridColumn TItem="ProposalMaterial"
+                                      Field="@nameof(ProposalMaterial.Quantity)"
+                                      Caption="Количество"
+                                      Sortable="true" />
+                        <DataGridColumn TItem="ProposalMaterial"
+                                      Field="@nameof(ProposalMaterial.Comment)"
+                                      Caption="Комментарий"
+                                      Sortable="true" />
+                        @if (_proposal.Status == ProposalStatus.Created)
+                        {
+                            <DataGridColumn TItem="ProposalMaterial" Caption="" Width="150px">
+                                <DisplayTemplate>
+                                    <div class="d-flex gap-2">
+                                        <Button Color="Color.Primary"
+                                                Clicked="@(() => ShowEditMaterialDialog(context))"
+                                                Size="Size.Small">
+                                            Редактировать
+                                        </Button>
+                                        <Button Color="Color.Danger"
+                                                Clicked="@(() => ShowDeleteMaterialDialog(context))"
+                                                Size="Size.Small">
+                                            Удалить
+                                        </Button>
+                                    </div>
+                                </DisplayTemplate>
+                            </DataGridColumn>
+                        }
+                    </DataGrid>
+                </TabPanel>
+            </Content>
+        </Tabs>
+    </div>
+
+    <MaterialEditForm @bind-Visible="_showMaterialEditDialog"
+                     Material="@_selectedMaterial"
+                     OnSubmit="@SaveMaterial"
+                     OnClose="@CloseMaterialDialog" />
+}
+
+<Modal @bind-Visible="@_showEditDialog">
+    <ModalContent>
+        <ModalHeader>
+            <ModalTitle>Редактирование заявки</ModalTitle>
+        </ModalHeader>
+        <ModalBody>
+            <Field>
+                <FieldLabel>Автор</FieldLabel>
+                <TextEdit @bind-Text="_editingProposal.Author" />
+            </Field>
+            <Field>
+                <FieldLabel>Подразделение</FieldLabel>
+                <TextEdit @bind-Text="_editingProposal.Depart" />
+            </Field>
+        </ModalBody>
+        <ModalFooter>
+            <Button Color="Color.Secondary" Clicked="@HideEditDialog">Отмена</Button>
+            <Button Color="Color.Primary" Clicked="@SaveProposal">Сохранить</Button>
+        </ModalFooter>
+    </ModalContent>
+</Modal>
+
+<Modal @bind-Visible="@_showDeleteDialog">
+    <ModalContent>
+        <ModalHeader>
+            <ModalTitle>Подтверждение удаления</ModalTitle>
+        </ModalHeader>
+        <ModalBody>
+            Вы уверены, что хотите удалить заявку №@GetFormattedProposalNumber(_proposal)?
+        </ModalBody>
+        <ModalFooter>
+            <Button Color="Color.Secondary" Clicked="@HideDeleteDialog">Нет</Button>
+            <Button Color="Color.Danger" Clicked="@DeleteProposal">Да</Button>
+        </ModalFooter>
+    </ModalContent>
+</Modal>
+
+<Modal @bind-Visible="@_showApproveDialog">
+    <ModalContent>
+        <ModalHeader>
+            <ModalTitle>Подтверждение утверждения</ModalTitle>
+        </ModalHeader>
+        <ModalBody>
+            Вы уверены, что хотите утвердить текущую заявку?
+        </ModalBody>
+        <ModalFooter>
+            <Button Color="Color.Secondary" Clicked="@HideApproveDialog">Нет</Button>
+            <Button Color="Color.Success" Clicked="@ApproveProposal">Да</Button>
+        </ModalFooter>
+    </ModalContent>
+</Modal>
+
+<Modal @bind-Visible="@_showDeleteMaterialDialog">
+    <ModalContent>
+        <ModalHeader>
+            <ModalTitle>Подтверждение удаления</ModalTitle>
+        </ModalHeader>
+        <ModalBody>
+            Вы уверены, что хотите удалить материал "@_selectedMaterial?.Material_Name"?
+        </ModalBody>
+        <ModalFooter>
+            <Button Color="Color.Secondary" Clicked="@HideDeleteMaterialDialog">Нет</Button>
+            <Button Color="Color.Danger" Clicked="@DeleteMaterial">Да</Button>
+        </ModalFooter>
+    </ModalContent>
+</Modal>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private Proposal? _proposal;
+    private List<ProposalMaterial> _materials = new();
+    private Proposal _editingProposal = new();
+    private string _selectedTab = "proposal";
+    private bool _showEditDialog;
+    private bool _showDeleteDialog;
+    private bool _showApproveDialog;
+    private bool _showMaterialEditDialog;
+    private bool _showDeleteMaterialDialog;
+    private ProposalMaterial? _selectedMaterial;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProposal();
+        await LoadMaterials();
+    }
+
+    private async Task LoadProposal()
+    {
+        _proposal = await ProposalService.GetProposalByIdAsync(Id);
+        if (_proposal != null)
+        {
+            _editingProposal = new Proposal
+            {
+                ID = _proposal.ID,
+                Author = _proposal.Author,
+                Depart = _proposal.Depart,
+                Creation_date = _proposal.Creation_date,
+                Status = _proposal.Status,
+                Proposal_num = _proposal.Proposal_num
+            };
+        }
+    }
+
+    private async Task LoadMaterials()
+{
+    if (_proposal != null)
+    {
+        _materials = (await ProposalService.GetProposalMaterialsAsync(_proposal.ID)).ToList();
+    }
+}
+
+    private void ReturnToList()
+    {
+        NavigationManager.NavigateTo("/proposals");
+    }
+
+    private void OnSelectedTabChanged(string name)
+    {
+        _selectedTab = name;
+    }
+
+    private void ShowEditDialog()
+    {
+        _showEditDialog = true;
+    }
+
+    private void HideEditDialog()
+    {
+        _showEditDialog = false;
+    }
+
+    private async Task SaveProposal()
+    {
+        if (_proposal != null)
+        {
+            await ProposalService.UpdateProposalAsync(_editingProposal);
+            await LoadProposal();
+            _showEditDialog = false;
+        }
+    }
+
+    private void ShowDeleteDialog()
+    {
+        _showDeleteDialog = true;
+    }
+
+    private void HideDeleteDialog()
+    {
+        _showDeleteDialog = false;
+    }
+
+    private async Task DeleteProposal()
+    {
+        if (_proposal != null)
+        {
+            await ProposalService.DeleteProposalAsync(_proposal.ID);
+            NavigationManager.NavigateTo("/proposals");
+        }
+    }
+
+    private void ShowApproveDialog()
+    {
+        _showApproveDialog = true;
+    }
+
+    private void HideApproveDialog()
+    {
+        _showApproveDialog = false;
+    }
+
+    private async Task ApproveProposal()
+    {
+        if (_proposal != null)
+        {
+            await ProposalService.ApproveProposalAsync(_proposal.ID);
+            await LoadProposal();
+            _showApproveDialog = false;
+        }
+    }
+
+    private void ShowCreateMaterialDialog()
+    {
+        _selectedMaterial = null;
+        _showMaterialEditDialog = true;
+    }
+
+    private void ShowEditMaterialDialog(ProposalMaterial material)
+    {
+        _selectedMaterial = material;
+        _showMaterialEditDialog = true;
+    }
+
+    private void CloseMaterialDialog()
+    {
+        _showMaterialEditDialog = false;
+        _selectedMaterial = null;
+    }
+
+    private async Task SaveMaterial(ProposalMaterial material)
+    {
+        if (_proposal != null)
+        {
+            material.ProposalId = _proposal.ID;
+            if (material.ID == 0)
+            {
+                await ProposalService.CreateProposalMaterialAsync(material);
+            }
+            else
+            {
+                await ProposalService.UpdateProposalMaterialAsync(material);
+            }
+            await LoadMaterials();
+            _showMaterialEditDialog = false;
+            _selectedMaterial = null;
+        }
+    }
+
+    private void ShowDeleteMaterialDialog(ProposalMaterial material)
+    {
+        _selectedMaterial = material;
+        _showDeleteMaterialDialog = true;
+    }
+
+    private void HideDeleteMaterialDialog()
+    {
+        _showDeleteMaterialDialog = false;
+        _selectedMaterial = null;
+    }
+
+    private async Task DeleteMaterial()
+    {
+        if (_selectedMaterial != null)
+        {
+            await ProposalService.DeleteProposalMaterialAsync(_selectedMaterial.ID);
+            await LoadMaterials();
+            _showDeleteMaterialDialog = false;
+            _selectedMaterial = null;
+        }
+    }
+
+    private string GetFormattedProposalNumber(Proposal proposal)
+    {
+        if (proposal == null) return string.Empty;
+        return $"{proposal.Creation_date:yy}/{proposal.Proposal_num:D4}";
+    }
+}

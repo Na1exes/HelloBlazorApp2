@@ -1,0 +1,81 @@
+@namespace HelloBlazorApp.Components.Materials
+@using HelloBlazorApp.Data.Entities
+
+<Modal @bind-Visible="@Visible">
+    <ModalContent>
+        <ModalHeader>
+            <ModalTitle>@(Material?.ID == 0 ? "Создание материала" : "Редактирование материала")</ModalTitle>
+        </ModalHeader>
+        <ModalBody>
+            <Field>
+                <FieldLabel>Наименование</FieldLabel>
+                <TextEdit @bind-Text="_editingMaterial.Material_Name" />
+            </Field>
+            <Field>
+                <FieldLabel>Код</FieldLabel>
+                <TextEdit @bind-Text="_editingMaterial.Material_Code" MaxLength="10" />
+            </Field>
+            <Field>
+                <FieldLabel>Количество</FieldLabel>
+                <NumericEdit TValue="int" @bind-Value="_editingMaterial.Quantity" Min="1" />
+            </Field>
+            <Field>
+                <FieldLabel>Комментарий</FieldLabel>
+                <TextEdit @bind-Text="_editingMaterial.Comment" />
+            </Field>
+        </ModalBody>
+        <ModalFooter>
+            <Button Color="Color.Secondary" Clicked="@OnClose">Отмена</Button>
+            <Button Color="Color.Primary" Clicked="@SaveMaterial">Сохранить</Button>
+        </ModalFooter>
+    </ModalContent>
+</Modal>
+
+@code {
+    [Parameter]
+    public bool Visible { get; set; }
+
+    [Parameter]
+    public ProposalMaterial? Material { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> VisibleChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<ProposalMaterial> OnSubmit { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    private ProposalMaterial _editingMaterial = new();
+
+    protected override void OnParametersSet()
+    {
+        if (Material != null)
+        {
+            _editingMaterial = new ProposalMaterial
+            {
+                ID = Material.ID,
+                Material_Name = Material.Material_Name,
+                Material_Code = Material.Material_Code,
+                Quantity = Material.Quantity,
+                Comment = Material.Comment,
+                ProposalId = Material.ProposalId,
+                Status = Material.Status
+            };
+        }
+        else
+        {
+            _editingMaterial = new ProposalMaterial
+            {
+                Status = MaterialStatus.Created
+            };
+        }
+    }
+
+    private async Task SaveMaterial()
+    {
+        await OnSubmit.InvokeAsync(_editingMaterial);
+        await VisibleChanged.InvokeAsync(false);
+    }
+}

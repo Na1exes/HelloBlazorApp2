@@ -1,0 +1,12 @@
+﻿global using HelloBlazorApp;
+global using HelloBlazorApp.Data;
+global using HelloBlazorApp.Data.Entities;
+global using HelloBlazorApp.Services;
+global using HelloBlazorApp.Models;
+global using HelloBlazorApp.Components;
+global using Blazorise;
+global using Blazorise.Bootstrap5;
+global using Blazorise.Icons.FontAwesome;
+global using Blazorise.DataGrid;
+global using Blazorise.Extensions;
+global using Microsoft.Extensions.DependencyInjection;

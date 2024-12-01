@@ -1,0 +1,183 @@
+@page "/proposals"
+@using HelloBlazorApp.Data.Entities
+@using HelloBlazorApp.Services
+@using Microsoft.AspNetCore.Components
+@using Blazorise
+@using Blazorise.DataGrid
+@using Blazorise.Components
+@inject IProposalPostServices ProposalService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Список заявок</PageTitle>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Список заявок</h1>
+        <Button Color="Color.Primary" Clicked="@ShowCreateDialog">
+            <Icon Name="IconName.Add" /> Создать заявку
+        </Button>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col">
+            <TextEdit Placeholder="Поиск по заявкам..." @bind-Text="@_searchText" />
+        </div>
+    </div>
+
+    <DataGrid TItem="Proposal" 
+             Data="@FilteredProposals" 
+             Responsive
+             Sortable
+             Filterable
+             ShowPager
+             PageSize="10"
+             Hoverable
+             Striped
+             RowClicked="@OnRowClicked">
+        <DataGridColumn TItem="Proposal" 
+                       Field="@nameof(Proposal.ID)" 
+                       Caption="№ заявки"
+                       Sortable>
+            <DisplayTemplate Context="proposal">
+                @GetFormattedProposalNumber(proposal)
+            </DisplayTemplate>
+        </DataGridColumn>
+        <DataGridColumn TItem="Proposal" 
+                       Field="@nameof(Proposal.Author)" 
+                       Caption="Автор заявки"
+                       Sortable>
+        </DataGridColumn>
+        <DataGridColumn TItem="Proposal" 
+                       Field="@nameof(Proposal.Depart)" 
+                       Caption="Подразделение автора"
+                       Sortable>
+        </DataGridColumn>
+        <DataGridColumn TItem="Proposal" 
+                       Field="@nameof(Proposal.Creation_date)" 
+                       Caption="Дата создания"
+                       Sortable>
+            <DisplayTemplate Context="proposal">
+                @proposal.Creation_date.ToString("dd.MM.yyyy")
+            </DisplayTemplate>
+        </DataGridColumn>
+        <DataGridColumn TItem="Proposal" 
+                       Field="@nameof(Proposal.Status)" 
+                       Caption="Статус"
+                       Sortable>
+            <DisplayTemplate Context="proposal">
+                <Badge Color="@GetStatusColor(proposal.Status)">
+                    @proposal.TextStatus
+                </Badge>
+            </DisplayTemplate>
+        </DataGridColumn>
+    </DataGrid>
+</div>
+
+@if (_showCreateDialog)
+{
+    <div class="modal fade show" style="display: block;" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Создание заявки</h5>
+                    <button type="button" class="btn-close" @onclick="HideCreateDialog"></button>
+                </div>
+                <div class="modal-body">
+                    <Field>
+                        <FieldLabel>Автор</FieldLabel>
+                        <TextEdit @bind-Text="@_newProposal.Author" />
+                    </Field>
+                    <Field>
+                        <FieldLabel>Подразделение</FieldLabel>
+                        <TextEdit @bind-Text="@_newProposal.Depart" />
+                    </Field>
+                </div>
+                <div class="modal-footer">
+                    <Button Color="Color.Secondary" Clicked="@HideCreateDialog">Отмена</Button>
+                    <Button Color="Color.Primary" Clicked="@CreateProposal">Создать</Button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+@code {
+    private List<Proposal> _proposals = new();
+    private bool _showCreateDialog;
+    private Proposal _newProposal = new();
+    private string _searchText = "";
+
+    private IEnumerable<Proposal> FilteredProposals =>
+        string.IsNullOrWhiteSpace(_searchText)
+            ? _proposals
+            : _proposals.Where(p =>
+                p.ID.ToString().Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
+                p.Author.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
+                p.Depart.Contains(_searchText, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProposals();
+    }
+
+    private async Task LoadProposals()
+    {
+        var proposals = await ProposalService.GetProposalAsync();
+        _proposals = proposals.ToList();
+    }
+
+    private void ShowCreateDialog()
+    {
+        _newProposal = new Proposal();
+        _showCreateDialog = true;
+        StateHasChanged();
+    }
+
+    private void HideCreateDialog()
+    {
+        _showCreateDialog = false;
+        StateHasChanged();
+    }
+
+    private async Task CreateProposal()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(_newProposal.Author) || string.IsNullOrWhiteSpace(_newProposal.Depart))
+            {
+                // TODO: Добавить уведомление пользователю
+                return;
+            }
+
+            var createdProposal = await ProposalService.CreateProposalAsync(_newProposal);
+            _showCreateDialog = false;
+            StateHasChanged();
+            
+            // Перенаправляем на страницу с деталями новой заявки
+            NavigationManager.NavigateTo($"/proposals/{createdProposal.ID}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error creating proposal: {ex.Message}");
+            // TODO: Добавить уведомление пользователю об ошибке
+        }
+    }
+
+    private void OnRowClicked(DataGridRowMouseEventArgs<Proposal> args)
+    {
+        NavigationManager.NavigateTo($"/proposals/{args.Item.ID}");
+    }
+
+    private string GetFormattedProposalNumber(Proposal proposal) =>
+        $"{proposal.Creation_date:yy}/{proposal.Proposal_num:D4}";
+
+    private Color GetStatusColor(ProposalStatus status) => status switch
+    {
+        ProposalStatus.Created => Color.Primary,
+        ProposalStatus.InProgress => Color.Warning,
+        ProposalStatus.Completed => Color.Success,
+        ProposalStatus.Rejected => Color.Danger,
+        _ => Color.Secondary
+    };
+}

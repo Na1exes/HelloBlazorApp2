@@ -1,0 +1,41 @@
+﻿@inherits LayoutComponentBase
+
+<Blazorise.ThemeProvider Theme="@theme">
+    <div class="page">
+        <div class="sidebar">
+            <NavMenu />
+        </div>
+
+        <main>
+            <div class="top-row px-4">
+                <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+            </div>
+
+            <article class="content px-4">
+                @Body
+            </article>
+        </main>
+    </div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
+    </div>
+</Blazorise.ThemeProvider>
+
+@code {
+    private Theme theme = new Theme
+    {
+        BarOptions = new ThemeBarOptions
+        {
+            HorizontalHeight = "72px"
+        },
+        ColorOptions = new ThemeColorOptions
+        {
+            Primary = "#0288D1",
+        },
+        BackgroundOptions = new ThemeBackgroundOptions(),
+        TextColorOptions = new ThemeTextColorOptions(),
+    };
+}
